@@ -36,6 +36,7 @@
 #include "BPTC19696.h"
 #include "APRSHelper.h"
 #include "DMRLookup.h"
+#include "Utils.h"
 
 #include <cstdio>
 #include <vector>
@@ -1421,6 +1422,10 @@ bool CDMRGateway::isGPSData(const CDMRData& data)
 			m_lastSlot2HadNMEA = false;
 			return true;
 		}
+	} else if (type == DT_DATA_HEADER)
+	{
+		LogDebug("Got Hytera Data Header");
+		return true;
 	}
 	return false;
 }
@@ -1434,6 +1439,7 @@ void CDMRGateway::extractGPSData(const CDMRData& data)
 	FLCO flco           = data.getFLCO();
 
 	unsigned char type = data.getDataType();
+	
 	if (type == DT_RATE_12_DATA) {
 		int8_t latSign = 0;
 		int8_t longSign = 0;
@@ -1476,5 +1482,20 @@ void CDMRGateway::extractGPSData(const CDMRData& data)
 
 			m_aprsHelper->send(src.c_str(), latitude * latSign, longitude * longSign, altitude);
 		}
+	}
+	else if (type == DT_DATA_HEADER)
+	{
+		LogDebug("Data Header slot %d: src is %u, dest is %s%u", slotNo, srcId, flco == FLCO_GROUP ? "TG" : "", dstId);
+	
+		std::string src = m_lookup->find(srcId);
+
+		CBPTC19696 bptc;
+		unsigned char buffer[DMR_FRAME_LENGTH_BYTES];
+
+		data.getData(buffer);
+
+		unsigned char payload[12U];
+		bptc.decode(buffer, payload);
+		CUtils::dump(1U, "RF Data Header", payload, 12U);
 	}
 }
